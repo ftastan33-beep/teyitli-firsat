@@ -1,6 +1,6 @@
-// Teyitli Fırsat service worker — sürüm 3.5
-const ONBELLEK = "kabuk-3.5";
-const KABUK = ["./", "index.html", "stil.css?v=3.5", "app.js?v=3.5", "manifest.webmanifest",
+// Düşero service worker — sürüm 3.7
+const ONBELLEK = "kabuk-3.7";
+const KABUK = ["./", "index.html", "stil.css?v=3.7", "app.js?v=3.7", "manifest.webmanifest",
   "ikon.svg", "ikon-192.png", "ikon-512.png", "yasal.html"];
 
 self.addEventListener("install", (e) => {
