@@ -1,7 +1,7 @@
 {
   "name": "Düşero",
   "short_name": "Düşero",
-  "description": "Gerçekten düşen fiyatlar",
+  "description": "Fiyatı gerçekten düşenler",
   "lang": "tr",
   "start_url": "./",
   "scope": "./",
