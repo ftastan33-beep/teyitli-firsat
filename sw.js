@@ -1,6 +1,6 @@
-// Düşero service worker — sürüm 3.7
-const ONBELLEK = "kabuk-3.7";
-const KABUK = ["./", "index.html", "stil.css?v=3.7", "app.js?v=3.7", "manifest.webmanifest",
+// Düşero service worker — sürüm 3.8
+const ONBELLEK = "kabuk-3.8";
+const KABUK = ["./", "index.html", "stil.css?v=3.8", "app.js?v=3.8", "manifest.webmanifest",
   "ikon.svg", "ikon-192.png", "ikon-512.png", "yasal.html"];
 
 self.addEventListener("install", (e) => {
