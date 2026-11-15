@@ -1,7 +1,7 @@
 // Düşero service worker — sürüm 3.9
 const ONBELLEK = "kabuk-3.9";
 const KABUK = ["./", "index.html", "stil.css?v=3.9", "app.js?v=3.9", "manifest.webmanifest",
-  "ikon.svg", "ikon-192.png", "ikon-512.png", "yasal.html"];
+  "logo.png?v=3.9", "favicon.png", "ikon-192.png", "ikon-512.png", "yasal.html"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(ONBELLEK).then((c) => c.addAll(KABUK)).then(() => self.skipWaiting()));

@@ -75,6 +75,8 @@ h1, h2, h3 { line-height: 1.15; }
 .ust-ic { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; flex-wrap: wrap; }
 .marka { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--murekkep); }
 .marka:hover { color: var(--murekkep); }
+.logo-resim { display: block; height: 54px; width: auto; }
+@media (max-width: 560px) { .logo-resim { height: 42px; } }
 .marka-ad { font-weight: 800; font-size: 25px; letter-spacing: -.035em; text-transform: lowercase; }
 .menu { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
 .menu-link { color: var(--murekkep); text-decoration: none; font-weight: 500; padding: 10px 2px; }
