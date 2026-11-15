@@ -194,7 +194,7 @@ h1, h2, h3 { line-height: 1.15; }
 .mini polyline { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .k-dip .mini polyline, .mini.k-dip polyline { stroke: var(--mavi-cizgi); }
 .mini.k-iyi polyline { stroke: var(--soluk); }
-.mini.k-sisirilmis polyline { stroke: var(--gul-cizgi); }
+.mini.k-sisirilmis polyline { stroke: var(--cizgi-koyu); }
 .mini.k-yok polyline { stroke: var(--cizgi-koyu); }
 .ozet-satir { margin: 0; font-size: 13px; line-height: 1.45; color: var(--soluk); }
 .ozet-satir:empty { display: none; }
@@ -219,7 +219,7 @@ h1, h2, h3 { line-height: 1.15; }
   font-weight: 700; white-space: nowrap; }
 .rozet.k-dip { background: var(--mavi-zemin); color: var(--mavi); }
 .rozet.k-iyi { background: var(--gri-zemin); color: var(--gri-yazi); }
-.rozet.k-sisirilmis { background: var(--gul-zemin); color: var(--gul); }
+.rozet.k-sisirilmis { background: transparent; color: var(--soluk); box-shadow: inset 0 0 0 1px var(--cizgi-koyu); font-weight: 600; }
 .rozet.k-yok { background: transparent; color: var(--soluk); box-shadow: inset 0 0 0 1px var(--cizgi-koyu); font-weight: 600; }
 @media (max-width: 540px) { .rozet { font-size: 11.5px; padding: 4px 8px; } }
 
@@ -278,7 +278,7 @@ h1, h2, h3 { line-height: 1.15; }
 .karar-kutu { border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.5; }
 .karar-kutu.k-dip { background: var(--mavi-zemin); color: var(--mavi); }
 .karar-kutu.k-iyi { background: var(--gri-zemin); color: var(--gri-yazi); }
-.karar-kutu.k-sisirilmis { background: var(--gul-zemin); color: var(--gul); }
+.karar-kutu.k-sisirilmis { background: var(--zemin); color: var(--soluk); }
 .karar-kutu.k-yok { background: var(--zemin); color: var(--soluk); }
 .karar-kutu .rozet { align-self: flex-start; background: var(--kart); }
 .ara-baslik { margin: 6px 0 0; font-size: 19px; }

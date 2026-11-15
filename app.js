@@ -15,7 +15,7 @@ const KARAR = {
   dip: { ad: "Gerçek indirim", sinif: "k-dip", sira: 0 },
   iyi: { ad: "İyi fiyat", sinif: "k-iyi", sira: 1 },
   yok: { ad: "Geçmiş az", sinif: "k-yok", sira: 2 },
-  sisirilmis: { ad: "Şişirilmiş indirim", sinif: "k-sisirilmis", sira: 3 },
+  sisirilmis: { ad: "Ortalama fiyat", sinif: "k-sisirilmis", sira: 3 },
 };
 const karar = (u) => KARAR[u.karar] || KARAR.yok;
 const gercekMi = (u) => u.karar === "dip" || u.karar === "iyi";
@@ -384,7 +384,7 @@ function kararMetni(u) {
       return `Mağaza ${u.yuzde ? "%" + u.yuzde + " " : ""}indirim gösteriyor ama ürün son ${gun} günde çoğunlukla ${tl(u.normal)} civarında satıldı. ` +
         (g > 0 ? `Gerçek düşüş yalnızca %${g}.` : "Fiyat her zamanki seviyesinde.");
     }
-    return "Üstü çizili fiyat kayıtlarımızda hiç görülmedi; indirim oranı olduğundan yüksek gösteriliyor olabilir.";
+    return "Üstü çizili fiyat kayıtlarımızda görülmedi; fiyat ürünün olağan seviyesinde görünüyor.";
   }
   return "Bu ürünün fiyat geçmişi henüz yeterli değil. Fiyat ve stok mağazada teyit edildi; indirimin gerçekliği kayıtlar biriktikçe netleşir.";
 }
