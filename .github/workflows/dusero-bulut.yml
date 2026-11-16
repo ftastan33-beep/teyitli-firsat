@@ -1,0 +1,146 @@
+name: Düşero bulut
+
+# Bilgisayardaki programın yerine geçer: kanalları okur, mağazada doğrular,
+# siteyi günceller ve Telegram kanalına paylaşır. Bilgisayar kapalıyken de çalışır.
+on:
+  schedule:
+    - cron: "7,37 * * * *"     # 30 dakikada bir (GitHub yoğunlukta birkaç dakika geciktirebilir)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dusero-bulut
+  cancel-in-progress: false
+
+jobs:
+  tur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      KASIM_FIRSAT_DIZIN: ${{ github.workspace }}/.veri
+      KF_DOGRULAMA_SN: "360"
+      TZ: Europe/Istanbul
+    steps:
+      - name: Program kodunu al (gizli depodan)
+        uses: actions/checkout@v5
+        with:
+          repository: ftastan33-beep/kasim-firsatlari
+          token: ${{ secrets.DUSERO_ANAHTAR }}
+          path: kod
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Mağaza okuma motoru
+        run: pip install --quiet --disable-pip-version-check curl_cffi || echo "curl_cffi kurulamadı; standart kütüphaneyle devam"
+
+      - name: Önceki veriyi geri yükle
+        id: onbellek
+        uses: actions/cache/restore@v4
+        with:
+          path: .veri
+          key: dusero-veri-${{ github.run_id }}
+          restore-keys: dusero-veri-
+
+      - name: İlk çalıştırma - bilgisayardan aktarılan veriyi al
+        if: steps.onbellek.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ secrets.DUSERO_ANAHTAR }}
+        run: |
+          mkdir -p .veri
+          if curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw" \
+               "https://api.github.com/repos/ftastan33-beep/kasim-firsatlari/contents/veri.tar.gz?ref=bulut-veri" -o /tmp/veri.tgz; then
+            tar -xzf /tmp/veri.tgz -C .veri && echo "Bilgisayardan aktarılan veri yüklendi"
+          else
+            echo "Aktarılan veri bulunamadı; sıfırdan başlanıyor"
+          fi
+
+      - name: Yayın ayarı (anahtarlar yalnız bu çalışma boyunca)
+        env:
+          DUSERO_ANAHTAR: ${{ secrets.DUSERO_ANAHTAR }}
+          TELEGRAM_BOT: ${{ secrets.TELEGRAM_BOT }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          yol = ".veri/yayin_genel.json"
+          a = json.load(open(yol, encoding="utf-8")) if os.path.exists(yol) else {"site_adi": "Düşero"}
+          g = a.setdefault("github", {})
+          g.update(depo="ftastan33-beep/teyitli-firsat", dal=g.get("dal") or "main", token=os.environ["DUSERO_ANAHTAR"])
+          tg = os.environ.get("TELEGRAM_BOT", "").strip()
+          if tg and (a.get("telegram") or {}).get("kanal"):
+              a["telegram"]["bot_token"] = tg
+          else:
+              a.pop("telegram", None)
+              print("Telegram anahtarı yok: bu turda kanala paylaşım yapılmayacak")
+          with open(".veri/yayin.json", "w", encoding="utf-8") as f:
+              json.dump(a, f, ensure_ascii=False)
+          PY
+
+      - name: Fırsatları oku, doğrula, yayınla
+        run: |
+          python3 - <<'PY'
+          import os, sys, time, traceback
+          ekran = sys.stdout
+          # Ayrıntılı program çıktısı herkese açık günlüğe yazılmaz; yalnızca özet görünür
+          sys.stdout = sys.stderr = open(os.path.join(os.environ["KASIM_FIRSAT_DIZIN"], "son_tur.log"), "w", encoding="utf-8")
+          def yaz(*m):
+              print(*m, file=ekran, flush=True)
+          sys.path.insert(0, os.path.abspath("kod"))
+          bas = time.time()
+          try:
+              import kasim_firsat as kf
+              depo = kf.Depo()
+              fl = kf.katalog_olustur(depo)
+              yy = kf.yayinci_olustur(depo)
+              if not yy or not yy.hazir():
+                  yaz("HATA: yayın ayarı eksik (DUSERO_ANAHTAR secret'ı tanımlı mı?)")
+                  sys.exit(1)
+              if fl and fl.ayar.get("feedler"):
+                  try:
+                      fl.guncelle(zorla=False, bildir=getattr(depo, "feed_bildir", None))
+                  except Exception as e:
+                      yaz("katalog güncellenemedi:", type(e).__name__)
+              depo.yenile()
+              yaz(f"kanallar okundu · {time.time() - bas:.0f} sn")
+              islenen = depo.dogrulama_turu(sure_sn=int(os.environ.get("KF_DOGRULAMA_SN", "360")))
+              for _ in range(36):                       # Akakçe → mağaza araması arka planda sürüyorsa bekle (en çok 3 dk)
+                  if not getattr(depo, "_akakce_calisiyor", False):
+                      break
+                  time.sleep(5)
+              islenen += depo.dogrulama_turu(sure_sn=90)
+              with depo.kilit:
+                  oz = depo.durum()["dogrulama"]
+              yaz(f"doğrulama · {islenen} ürün · onaylı {oz['onayli']} · koşullu {oz['kosullu']} · red {oz['red']} · "
+                  f"okunamadı {oz['okunamadi']} · kuyrukta {oz['kuyruk']}"
+                  + (f" · engelleyen mağaza: {', '.join(oz['engelli'])}" if oz.get("engelli") else ""))
+              n = yy.yayinla()
+              yaz(f"site · {n} fırsat yayınlandı" if n is not None else "site · liste değişmedi, yükleme gerekmedi")
+              if yy.son_hata:
+                  yaz("uyarı ·", yy.son_hata)
+              with depo.kilit:
+                  kf.json_yaz(kf.VERI_DOSYASI, depo.veri)
+          except SystemExit:
+              raise
+          except Exception as e:
+              yaz("HATA:", type(e).__name__, str(e)[:200])
+              traceback.print_exc()
+              sys.exit(1)
+          yaz(f"tur tamam · {time.time() - bas:.0f} sn")
+          sys.stdout.flush()
+          os._exit(0)                                   # arka plandaki iş parçacıkları beklenmesin
+          PY
+
+      - name: Anahtarları sil
+        if: always()
+        run: rm -f .veri/yayin.json
+
+      - name: Veriyi sakla
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .veri
+          key: dusero-veri-${{ github.run_id }}
