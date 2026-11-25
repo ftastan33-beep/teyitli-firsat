@@ -12,6 +12,7 @@ Ayrıca index.html ve yasal.html'e canonical, Open Graph ve yapılandırılmış
 Yalnızca Python standart kütüphanesi kullanır. Kullanım: python3 seo/uret.py [site_dizini]
 GitHub Actions'ta saatte bir çalışır; ileride VDS'e geçildiğinde cron ile aynı şekilde çalıştırılabilir.
 """
+import hashlib
 import html
 import json
 import os
@@ -374,11 +375,16 @@ def veri_oku():
     return veri, tekil
 
 
+URETICI = hashlib.sha1(open(os.path.abspath(__file__), "rb").read()).hexdigest()[:12]
+
+
 def gerek_yok():
     """Ana sayfada SEO bloğu duruyor ve sitemap son 55 dakikada yenilendiyse çalışmaya gerek yok."""
     try:
         ana = open(os.path.join(KOK, "index.html"), encoding="utf-8").read()
         sm = open(os.path.join(KOK, "sitemap.xml"), encoding="utf-8").read()
+        if f"<!-- uretici:{URETICI} -->" not in sm:      # üretici kodu değiştiyse her zaman yeniden üret
+            return False
         r = re.search(r"<lastmod>([^<]+)</lastmod>", sm)
         son = datetime.fromisoformat(r.group(1)).timestamp() if r else 0
     except (OSError, ValueError):
@@ -507,6 +513,7 @@ def main():
     for loc, mod, pr in girdiler:
         sm.append(f"<url><loc>{e(loc)}</loc>" + (f"<lastmod>{mod}</lastmod>" if mod else "") + f"<priority>{pr}</priority></url>")
     sm.append("</urlset>")
+    sm.append(f"<!-- uretici:{URETICI} -->")
     yaz("sitemap.xml", "\n".join(sm) + "\n")
 
     yaz("robots.txt", f"User-agent: *\nAllow: /\n\nSitemap: {SITE}/sitemap.xml\n")

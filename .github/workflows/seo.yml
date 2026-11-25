@@ -34,8 +34,8 @@ jobs:
 
       - name: Sayfaları üret ve yayınla
         env:
-          # Kod değişikliği ya da elle çalıştırmada her zaman üret; veri güncellemesinde saatte bir
-          BAYRAK: ${{ (github.event_name == 'push' && !contains(join(github.event.commits.*.modified, ','), 'seo/') && !contains(join(github.event.commits.*.modified, ','), 'workflows/')) && '--gerekirse' || '' }}
+          # Veri/tasarım güncellemesinde saatte en fazla bir üretim; üretici kodu değiştiyse her zaman üretir
+          BAYRAK: ${{ github.event_name == 'push' && '--gerekirse' || '' }}
         run: |
           git config user.name "Düşero SEO"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
