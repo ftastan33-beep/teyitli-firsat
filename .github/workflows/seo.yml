@@ -1,7 +1,8 @@
 name: Düşero SEO sayfaları
 
-# veri.json'dan Google'ın okuyabileceği kategori/mağaza sayfalarını, sitemap.xml'i ve
-# ana sayfadaki SEO etiketlerini saatte bir yeniler. Program verisine dokunmaz.
+# veri.json'dan Google'ın okuyabileceği kategori/mağaza sayfalarını, sitemap.xml'i ve ana sayfadaki
+# SEO etiketlerini yeniler. Fırsat verisi her güncellendiğinde tetiklenir ama en fazla saatte bir sayfa
+# üretir; ana sayfa tasarımı değişip SEO etiketleri silinirse hemen geri ekler. Program verisine dokunmaz.
 on:
   schedule:
     - cron: "23 * * * *"
@@ -9,6 +10,9 @@ on:
   push:
     branches: [main]
     paths:
+      - "veri.json"
+      - "index.html"
+      - "yasal.html"
       - "seo/**"
       - ".github/workflows/seo.yml"
 
@@ -29,6 +33,9 @@ jobs:
           fetch-depth: 1
 
       - name: Sayfaları üret ve yayınla
+        env:
+          # Kod değişikliği ya da elle çalıştırmada her zaman üret; veri güncellemesinde saatte bir
+          BAYRAK: ${{ (github.event_name == 'push' && !contains(join(github.event.commits.*.modified, ','), 'seo/') && !contains(join(github.event.commits.*.modified, ','), 'workflows/')) && '--gerekirse' || '' }}
         run: |
           git config user.name "Düşero SEO"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -36,7 +43,7 @@ jobs:
           for deneme in 1 2 3 4 5; do
             git fetch --depth=1 origin main
             git reset --hard FETCH_HEAD
-            python3 seo/uret.py
+            python3 seo/uret.py $BAYRAK
             git add -A indirimler kacirilmaz-firsatlar cok-satanlar sitemap.xml robots.txt index.html yasal.html
             if git diff --cached --quiet; then
               echo "Değişiklik yok"

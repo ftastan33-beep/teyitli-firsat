@@ -25,7 +25,8 @@ AD = "Düşero"
 TELEGRAM = "https://t.me/dusero_tr"
 KAPAK = f"{SITE}/paylasim.jpg"
 TR = timezone(timedelta(hours=3))
-KOK = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), ".."))
+_ARG = [a for a in sys.argv[1:] if not a.startswith("--")]
+KOK = os.path.abspath(_ARG[0] if _ARG else os.path.join(os.path.dirname(__file__), ".."))
 SAYFA_URUN = 60          # bir sayfada gösterilecek ürün sayısı
 MAGAZA_ESIK = 10         # bu sayıdan az ürünü olan mağazaya ayrı sayfa açılmaz
 AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos",
@@ -352,10 +353,46 @@ def yaz(yol, icerik):
         f.write(icerik)
 
 
-def main():
+def veri_oku():
+    """veri.json + parça dosyaları (veri-1.json, veri-2.json …) — app.js ile aynı düzen."""
     veri = json.load(open(os.path.join(KOK, "veri.json"), encoding="utf-8"))
+    hepsi = list(veri.get("urunler") or [])
+    parcalar = veri.get("parcalar")
+    adet = len(parcalar) if isinstance(parcalar, list) else int(parcalar or 0)
+    for i in range(1, adet + 1):
+        yol = os.path.join(KOK, f"veri-{i}.json")
+        if not os.path.exists(yol):
+            continue
+        p = json.load(open(yol, encoding="utf-8"))
+        hepsi.extend(p if isinstance(p, list) else (p.get("urunler") or []))
+    gor, tekil = set(), []
+    for u in hepsi:
+        if u.get("id") in gor:
+            continue
+        gor.add(u.get("id"))
+        tekil.append(u)
+    return veri, tekil
+
+
+def gerek_yok():
+    """Ana sayfada SEO bloğu duruyor ve sitemap son 55 dakikada yenilendiyse çalışmaya gerek yok."""
+    try:
+        ana = open(os.path.join(KOK, "index.html"), encoding="utf-8").read()
+        sm = open(os.path.join(KOK, "sitemap.xml"), encoding="utf-8").read()
+        r = re.search(r"<lastmod>([^<]+)</lastmod>", sm)
+        son = datetime.fromisoformat(r.group(1)).timestamp() if r else 0
+    except (OSError, ValueError):
+        return False
+    return BAS_ISARET in ana and LBAS in ana and time.time() - son < 55 * 60
+
+
+def main():
+    if "--gerekirse" in sys.argv and gerek_yok():
+        print("SEO · güncel, atlandı")
+        return
+    veri, ham = veri_oku()
     guncelleme = int(veri.get("guncelleme") or time.time())
-    urunler = [u for u in veri.get("urunler", []) if (u.get("fiyat") or 0) > 0 and u.get("id") and u.get("baslik")]
+    urunler = [u for u in ham if (u.get("fiyat") or 0) > 0 and u.get("id") and u.get("baslik")]
     for u in urunler:
         if u.get("yuzde") is None and u.get("kanal_yuzde"):
             u["yuzde"] = u["kanal_yuzde"]
