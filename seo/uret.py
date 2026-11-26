@@ -98,21 +98,63 @@ def iso(ts):
 
 
 # Uygulamadaki (app.js) indirim hesabının aynısı
-def indirim(u):
-    if u.get("karar") == "sisirilmis":
+GUN = 86400
+REF_GUN = 10      # indirimden önceki fiyat: son 10 günün en düşük fiyatı (sitedeki app.js ile aynı kural)
+MIN_ROZET = 5
+KAC_ESIK = 10
+
+
+def gercek_indirim(u):
+    """Yalnızca Düşero'nun kendi fiyat geçmişinden: mevcut fiyattan önceki 10 günün en düşük fiyatına göre."""
+    f = u.get("fiyat") or 0
+    if u.get("karar") == "sisirilmis" or f <= 0:
         return None
-    gy, nr, f = u.get("gercek_yuzde") or 0, u.get("normal") or 0, u.get("fiyat") or 0
-    if u.get("karar") in ("dip", "iyi") and gy > 0 and nr > f:
-        return {"oran": gy, "tl": nr - f, "ref": nr}
-    ef = u.get("eski_fiyat") or 0
-    if ef > f > 0:
-        return {"oran": round((ef - f) / ef * 100), "tl": ef - f, "ref": ef}
-    return None
+    g = sorted((p for p in (u.get("gecmis") or []) if p and len(p) > 1 and (p[1] or 0) > 0), key=lambda p: p[0])
+    if len(g) < 2:
+        return None
+    bas = max(u.get("teyit") or 0, g[-1][0])
+    for ts, fy in reversed(g):
+        if fy <= f * 1.005:
+            bas = ts
+        else:
+            break
+    pb = bas - REF_GUN * GUN
+    if g[0][0] > pb:
+        return None
+    ilk = None
+    for ts, fy in g:
+        if ts <= pb:
+            ilk = fy
+        else:
+            break
+    fl = [x for x in [ilk] + [fy for ts, fy in g if pb < ts < bas] if x and x > 0]
+    if not fl:
+        return None
+    ref = min(fl)
+    if ref <= f:
+        return None
+    o = round((ref - f) / ref * 100)
+    return {"oran": o, "tl": ref - f, "ref": ref} if o >= MIN_ROZET else None
+
+
+def normallestir(u):
+    """Mağazanın üstü çizili fiyatı ve başka kanalların oranı indirim olarak kullanılmaz."""
+    g = gercek_indirim(u)
+    u["_g"] = g
+    u["yuzde"] = g["oran"] if g else None
+    u["eski_fiyat"] = g["ref"] if g else None
+    ak = u.get("akakce") or {}
+    ucuz = bool(ak.get("en_ucuz") and u["fiyat"] > ak["en_ucuz"] * 1.05)
+    u["kac"] = bool(g and g["oran"] >= KAC_ESIK and not ucuz)
+
+
+def indirim(u):
+    return u.get("_g")
 
 
 def oran(u):
     i = indirim(u)
-    return i["oran"] if i else max(u.get("yuzde") or 0, u.get("gercek_yuzde") or 0)
+    return i["oran"] if i else 0
 
 
 def sirala(ls):
@@ -135,7 +177,7 @@ def kart(u):
     resim = u.get("resim")
     gorsel = (f'<img src="{e(resim)}" alt="{e(u["baslik"])}" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
               if resim else "")
-    rozet = f'<span class="oran-rozet">%{o}</span>' if o and o > 0 and u.get("karar") != "sisirilmis" else ""
+    rozet = f'<span class="oran-rozet">%{o}</span>' if i and o > 0 else ""
     eski = f'<s class="eski">{tl(i["ref"])}</s>' if i else ""
     etk = ""
     if u.get("kac"):
@@ -252,7 +294,7 @@ def sayfa_html(s, tum_kat, tum_mag, guncelleme, v):
 </section>
 <section class="seo-blok">
 <h2>Düşero indirimleri nasıl kontrol ediyor?</h2>
-<p>Her ürünün fiyatı ve stoğu mağaza sayfasından okunur; yeni fiyat, ürünün son 90 günde kaydedilen fiyatlarıyla karşılaştırılır. Son ayların en düşük fiyatına inen ürünler “Kaçırılmaz”, dönemin en düşük fiyatındakiler “Gerçek indirim”, olağan fiyatının altındakiler “İyi fiyat” olarak işaretlenir. Önce fiyatı artırılıp sonra “indirim” diye sunulan ürünler bu etiketleri almaz. Fiyatlar mağazalarca anlık değişebilir; satın almadan önce mağazadaki son fiyatı kontrol edin.</p>
+<p>Her ürünün fiyatı ve stoğu mağaza sayfasından okunur; indirim oranı mağazanın üstü çizili fiyatından değil, ürünün son 10 günde kaydettiğimiz en düşük fiyatından hesaplanır; fiyat geçmişi 10 günden kısa olan üründe oran gösterilmez. Bu fiyattan en az %10 ucuza inen ürünler “Kaçırılmaz”, dönemin en düşük fiyatındakiler “Gerçek indirim”, olağan fiyatının altındakiler “İyi fiyat” olarak işaretlenir. Önce fiyatı artırılıp sonra “indirim” diye sunulan ürünler bu etiketleri almaz. Fiyatlar mağazalarca anlık değişebilir; satın almadan önce mağazadaki son fiyatı kontrol edin.</p>
 <p>Fiyat düştüğü anda haber almak için <a href="{TELEGRAM}" rel="noopener">Düşero Telegram kanalına</a> katılabilirsiniz.</p>
 </section>
 </main>
@@ -273,8 +315,8 @@ def sayfa_html(s, tum_kat, tum_mag, guncelleme, v):
 BAS_ISARET, SON_ISARET = "<!--seo:bas-->", "<!--seo:son-->"
 LBAS, LSON = "<!--seo-linkler:bas-->", "<!--seo-linkler:son-->"
 ANA_TITLE = "Düşero · Fiyatı Gerçekten Düşen Ürünler ve Gerçek İndirimler"
-ANA_ACIKLAMA = ("Trendyol, Hepsiburada, Amazon ve n11'de fiyatı gerçekten düşen ürünler. Her indirim 90 günlük "
-                "fiyat geçmişiyle karşılaştırılır.")
+ANA_ACIKLAMA = ("Trendyol, Hepsiburada, Amazon ve n11'de fiyatı gerçekten düşen ürünler. İndirim oranı, ürünün son 10 "
+                "gündeki en düşük fiyatına göre hesaplanır.")
 
 
 def blok_degistir(metin, bas, son, yeni, once):
@@ -400,8 +442,7 @@ def main():
     guncelleme = int(veri.get("guncelleme") or time.time())
     urunler = [u for u in ham if (u.get("fiyat") or 0) > 0 and u.get("id") and u.get("baslik")]
     for u in urunler:
-        if u.get("yuzde") is None and u.get("kanal_yuzde"):
-            u["yuzde"] = u["kanal_yuzde"]
+        normallestir(u)
     v = surum()
     ay = f"{AYLAR[datetime.fromtimestamp(guncelleme, TR).month - 1]} {datetime.fromtimestamp(guncelleme, TR).year}"
 
@@ -427,12 +468,12 @@ def main():
         giris = KAT_METIN.get(k, f"{ad} kategorisinde fiyatı gerçekten düşen ürünler.") + \
             f" Şu anda {len(ls)} üründe fiyat düşüşü takip ediliyor" + \
             (f"; en büyük düşüş %{o} ile {en['baslik'][:70]}." if en and o > 0 else ".") + \
-            " Her indirim ürünün son 90 günlük fiyat geçmişiyle karşılaştırılır."
+            " İndirim oranı, ürünün son 10 gündeki en düşük fiyatına göre hesaplanır."
         kat_sayfa.append({
             "yol": f"/indirimler/{slug(d['ad'])}/", "kisa": ad, "h1": f"{ad} İndirimleri",
             "title": f"{ad} İndirimleri – {ay} | {AD}",
             "aciklama": (f"{ad}: fiyatı düşen {len(ls)} ürün" + (f", en büyük düşüş %{o}" if o > 0 else "") +
-                         ". İndirimler 90 günlük fiyat geçmişiyle karşılaştırılır, fiyat mağazada kontrol edilir."),
+                         ". İndirim oranı son 10 günün en düşük fiyatına göre hesaplanır, fiyat mağazada kontrol edilir."),
             "giris": giris, "urunler": ls, "ust": [("İndirimler", "/indirimler/")],
         })
 
@@ -452,10 +493,10 @@ def main():
             "yol": f"/indirimler/{slug(ad)}/", "kisa": ad, "h1": f"{ad} İndirimleri ve Fırsatları",
             "title": f"{ad} İndirimleri – Fiyatı Düşenler, {ay} | {AD}",
             "aciklama": (f"{ad} indirimleri: fiyatı düşen {len(ls)} ürün" + (f", en büyük düşüş %{o}" if o > 0 else "") +
-                         ". Her indirim 90 günlük fiyat geçmişiyle karşılaştırılır."),
+                         ". İndirim oranı son 10 günün en düşük fiyatına göre hesaplanır."),
             "giris": (f"{ad} mağazasında fiyatı gerçekten düşen ürünler. Şu anda {len(ls)} ürün listede" +
                       (f"; en büyük düşüş %{o}." if o > 0 else ".") +
-                      f" {AD}, {ad} indirimlerini ürünün son 90 günlük fiyatıyla karşılaştırır; fiyat ve stok mağaza sayfasında kontrol edilir."),
+                      f" {AD}, {ad} indirimlerinin oranını ürünün son 10 gündeki en düşük fiyatına göre hesaplar; fiyat ve stok mağaza sayfasında kontrol edilir."),
             "urunler": ls, "ust": [("İndirimler", "/indirimler/")],
         })
 
@@ -463,10 +504,10 @@ def main():
     kac = sirala([u for u in urunler if u.get("kac")])
     cok = sorted([u for u in urunler if u.get("cok")], key=lambda u: ((u["cok"].get("s") or 999), -oran(u)))
     ozel = [
-        {"yol": "/kacirilmaz-firsatlar/", "kisa": "Kaçırılmaz fırsatlar", "h1": "Kaçırılmaz Fırsatlar: Son Ayların En Düşük Fiyatları",
-         "title": f"Kaçırılmaz Fırsatlar – Son Ayların En Düşük Fiyatları | {AD}",
-         "aciklama": f"Fiyatı son ayların en düşük seviyesine inen {len(kac)} ürün. Trendyol, Hepsiburada, Amazon ve n11'in gerçek indirimleri, en büyük düşüş önce.",
-         "giris": "Fiyatı son ayların en düşük seviyesine inen ya da olağan fiyatının belirgin biçimde altına düşen ürünler. Liste en büyük indirimden küçüğe sıralanır.",
+        {"yol": "/kacirilmaz-firsatlar/", "kisa": "Kaçırılmaz fırsatlar", "h1": "Kaçırılmaz Fırsatlar: Fiyatı Gerçekten Düşenler",
+         "title": f"Kaçırılmaz Fırsatlar – Fiyatı Gerçekten Düşenler | {AD}",
+         "aciklama": f"Son 10 günün en düşük fiyatından en az %10 ucuza inen {len(kac)} ürün. Trendyol, Hepsiburada, Amazon ve n11'in gerçek indirimleri, en büyük düşüş önce.",
+         "giris": "Fiyatı, son 10 günde kaydettiğimiz en düşük fiyatından en az %10 aşağı inen ürünler. Mağazanın üstü çizili fiyatı kullanılmaz. Liste en büyük indirimden küçüğe sıralanır.",
          "urunler": kac},
         {"yol": "/cok-satanlar/", "kisa": "Çok satanlar", "h1": "En Çok Satanlar ve Güncel Fiyatları",
          "title": f"En Çok Satan Ürünler ve Fiyatları, {ay} | {AD}",
@@ -478,7 +519,7 @@ def main():
     en, o = ozet(tum)
     merkez = {"yol": "/indirimler/", "kisa": "Tüm indirimler", "h1": "Güncel İndirimler ve Fiyatı Düşen Ürünler",
               "title": f"Güncel İndirimler, {ay} – Fiyatı Düşen Ürünler | {AD}",
-              "aciklama": f"Bugün fiyatı düşen {len(tum)} ürün; kategori ve mağazaya göre gerçek indirimler. Her indirim 90 günlük fiyat geçmişiyle kontrol edilir.",
+              "aciklama": f"Bugün fiyatı düşen {len(tum)} ürün; kategori ve mağazaya göre gerçek indirimler. İndirim oranı son 10 günün en düşük fiyatına göre hesaplanır.",
               "giris": (f"Trendyol, Hepsiburada, Amazon, n11 ve diğer mağazalarda fiyatı düşen {len(tum)} ürün" +
                         (f"; en büyük düşüş şu anda %{o}." if o > 0 else ".") +
                         " Aşağıdan kategori ya da mağaza seçerek o bölümün gerçek indirimlerini görebilirsiniz."),
