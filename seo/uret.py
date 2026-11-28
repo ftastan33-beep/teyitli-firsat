@@ -800,17 +800,14 @@ def ana_sayfa_isle(tum_kat, tum_mag, one_cikan, magaza_adlari, guncelleme):
     m = blok_degistir(m, BAS_ISARET, SON_ISARET, bas, "</head>")
     one = ""
     if one_cikan:
-        one = ('<h2 id="seo-one-baslik">Bugünün öne çıkan indirimleri</h2>'
-               f'<p>{gun_yazi(guncelleme)} {datetime.fromtimestamp(guncelleme, TR):%H:%M} itibarıyla {AD} listesinde '
-               'öne çıkan ürünler; fiyat geçmişi ve mağaza karşılaştırması ürün sayfasında.</p>'
-               + one_cikanlar_html(one_cikan))
+        one = one_cikanlar_html(one_cikan)   # başlık ve "… itibarıyla" açıklaması kullanıcı isteğiyle kaldırıldı
     nedir = (f'<h2>{AD} nedir?</h2>'
              f'<p>{AD}, online mağazalarda fiyatı gerçekten düşen ürünleri takip eden bağımsız bir fiyat takip sitesidir; '
              f'sloganımız da adımızdan geliyor: “{SLOGAN}.” İndirimi mağazanın üstü çizili fiyatına göre değil, '
              'ürünün kendi fiyat geçmişine göre ölçer, aynı ürünü başka mağazalarda bulduğunda fiyatları yan yana '
              'gösterir ve paylaşılan <a href="/kuponlar/">indirim kuponlarını</a> kontrol ederek listeler. '
              f'<a href="/hakkinda/">{AD} nasıl çalışır?</a></p>')
-    linkler = (f'<section class="bolum seo-blok" aria-labelledby="{"seo-one-baslik" if one else "seo-kat-baslik"}">'
+    linkler = (f'<section class="bolum seo-blok" aria-labelledby="seo-kat-baslik">'
                + ANA_STIL + one +
                '<h2 id="seo-kat-baslik">Kategoriye göre indirimler</h2>' + link_listesi(tum_kat) +
                '<h2>Mağazaya göre indirimler</h2>' + link_listesi(tum_mag) + nedir + "</section>")
