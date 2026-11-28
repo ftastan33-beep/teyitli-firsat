@@ -1,0 +1,9 @@
+{
+  "_aciklama": "Düşero SEO ayarları (seo/uret.py okur). Doğrulama alanlarına arama motorunun verdiği kodun yalnızca content=\"...\" içindeki değeri yazılır; boş bırakılan alan için ana sayfaya hiçbir etiket eklenmez. indexnow_anahtar herkese açıktır (IndexNow kuralı gereği sitenin kökünde <anahtar>.txt olarak durur). urun_sayfasi_linki false yapılırsa liste sayfalarındaki ürün kartları eskisi gibi ana sayfaya (/#u-<kimlik>) bağlanır. sayfa_en_fazla: bir kategori/mağaza listesinin en fazla kaç sayfaya (60'ar ürün) bölüneceği (1-20).",
+  "google_dogrulama": "",
+  "bing_dogrulama": "",
+  "yandex_dogrulama": "",
+  "indexnow_anahtar": "daa9e1f3289bd12ccabf482e55763328",
+  "urun_sayfasi_linki": true,
+  "sayfa_en_fazla": 10
+}

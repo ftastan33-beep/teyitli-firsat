@@ -44,7 +44,10 @@ jobs:
             git fetch --depth=1 origin main
             git reset --hard FETCH_HEAD
             python3 seo/uret.py $BAYRAK
-            git add -A indirimler kacirilmaz-firsatlar cok-satanlar sitemap.xml robots.txt index.html yasal.html
+            git add -A indirimler kacirilmaz-firsatlar cok-satanlar kuponlar hakkinda sitemap.xml robots.txt index.html yasal.html
+            # IndexNow anahtar dosyası (seo/ayar.json'daki anahtar; herkese açık olması kural gereği)
+            ANAHTAR=$(python3 -c "import json;print(json.load(open('seo/ayar.json')).get('indexnow_anahtar',''))" 2>/dev/null || true)
+            [ -n "$ANAHTAR" ] && [ -f "$ANAHTAR.txt" ] && git add "$ANAHTAR.txt"
             if git diff --cached --quiet; then
               echo "Değişiklik yok"
               exit 0
@@ -52,9 +55,49 @@ jobs:
             git commit -q -m "SEO sayfaları güncellendi"
             if git push -q origin HEAD:main; then
               echo "Yayınlandı (deneme $deneme)"
+              # Bu kayıtta değişen sayfalar (IndexNow bildirimi için; ürün sayfaları bu depoda değil)
+              git diff --name-only HEAD~1 HEAD > "$RUNNER_TEMP/degisen.txt" || true
               exit 0
             fi
             sleep $((deneme * 8))
           done
           echo "Gönderilemedi; bir sonraki saatte tekrar denenecek"
           exit 1
+
+      - name: Değişen sayfaları arama motorlarına bildir (IndexNow · Bing, Yandex)
+        # Google IndexNow kullanmıyor; o site haritasını okur. Bu adım hiçbir durumda işi başarısız yapmaz.
+        if: success()
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          python3 - <<'PY' || true
+          import json, os, urllib.request
+          yol = os.path.join(os.environ.get("RUNNER_TEMP", "/tmp"), "degisen.txt")
+          if not os.path.exists(yol):
+              print("Yeni yayın yok; bildirim yapılmadı"); raise SystemExit(0)
+          try:
+              anahtar = json.load(open("seo/ayar.json", encoding="utf-8")).get("indexnow_anahtar", "").strip()
+          except Exception:
+              anahtar = ""
+          if not anahtar or not os.path.exists(anahtar + ".txt"):
+              print("IndexNow anahtarı yok; bildirim yapılmadı"); raise SystemExit(0)
+          site = "https://dusero.com"
+          adresler = []
+          for f in open(yol, encoding="utf-8").read().split():
+              if f == "index.html":
+                  adresler.append(site + "/")
+              elif f.endswith("/index.html"):
+                  adresler.append(site + "/" + f[:-len("index.html")])
+          adresler = sorted(set(adresler), key=lambda a: (a.count("/"), a))[:500]
+          if not adresler:
+              print("Değişen sayfa adresi yok"); raise SystemExit(0)
+          govde = json.dumps({"host": "dusero.com", "key": anahtar, "keyLocation": f"{site}/{anahtar}.txt",
+                              "urlList": adresler}).encode()
+          istek = urllib.request.Request("https://api.indexnow.org/indexnow", data=govde, method="POST",
+                                         headers={"Content-Type": "application/json; charset=utf-8"})
+          try:
+              with urllib.request.urlopen(istek, timeout=30) as y:
+                  print(f"IndexNow: {len(adresler)} adres bildirildi (HTTP {y.status})")
+          except Exception as e:
+              print(f"IndexNow bildirimi yapılamadı ({len(adresler)} adres): {str(e)[:200]}")
+          PY
