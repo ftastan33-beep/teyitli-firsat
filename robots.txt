@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://dusero.com/sitemap.xml
+Sitemap: https://dusero.com/u/sitemap.xml
