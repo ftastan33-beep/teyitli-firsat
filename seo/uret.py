@@ -798,9 +798,7 @@ def ana_sayfa_isle(tum_kat, tum_mag, one_cikan, magaza_adlari, guncelleme):
            f'<meta property="og:image:height" content="630"> <meta name="twitter:card" content="summary_large_image"> '
            f'<script type="application/ld+json">{ld_json(ana_ld(arama_destekli()))}</script>')
     m = blok_degistir(m, BAS_ISARET, SON_ISARET, bas, "</head>")
-    one = ""
-    if one_cikan:
-        one = one_cikanlar_html(one_cikan)   # başlık ve "… itibarıyla" açıklaması kullanıcı isteğiyle kaldırıldı
+    one = ""   # ana sayfadaki "Bugünün öne çıkan indirimleri" bölümü (başlık + ürün listesi) kullanıcı isteğiyle kaldırıldı
     nedir = (f'<h2>{AD} nedir?</h2>'
              f'<p>{AD}, online mağazalarda fiyatı gerçekten düşen ürünleri takip eden bağımsız bir fiyat takip sitesidir; '
              f'sloganımız da adımızdan geliyor: “{SLOGAN}.” İndirimi mağazanın üstü çizili fiyatına göre değil, '
