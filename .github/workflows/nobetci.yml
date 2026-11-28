@@ -1,0 +1,75 @@
+# Düşero nöbetçisi: Kasım Fırsatları programı durursa haber verir.
+# Her 30 dakikada bir veri.json'un son güncellenme zamanına bakar.
+# 45 dakikadan eskiyse:
+#   - TELEGRAM_BOT_TOKEN ve TELEGRAM_SAHIP_ID gizli değişkenleri tanımlıysa sahibine Telegram mesajı atar
+#     (ilk fark edişte, sonra 3 saatte bir)
+#   - aynı anlarda iş "başarısız" olur; GitHub bu yüzden ayrıca e-posta bildirimi gönderir
+# Program yeniden yayın yapmaya başlayınca bir kez "tekrar çalışıyor" mesajı atar.
+name: Nöbetçi
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: nobetci
+  cancel-in-progress: false
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Son güncellemeyi kontrol et
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_ID: ${{ secrets.TELEGRAM_SAHIP_ID }}
+          ESIK_DK: "45"
+          TEKRAR_DK: "180"
+        run: |
+          set -euo pipefail
+          # Son iki veri.json güncellemesi (yeni → eski)
+          mapfile -t tarih < <(gh api "repos/$REPO/commits?path=veri.json&per_page=2" --jq '.[].commit.committer.date')
+          dk() { echo $(( ( $(date -u +%s) - $(date -u -d "$1" +%s) ) / 60 )); }
+          yas=$(dk "${tarih[0]}")
+          son_tr=$(TZ=Europe/Istanbul date -d "${tarih[0]}" '+%d.%m %H:%M')
+          echo "Son güncelleme: $son_tr (yaklaşık $yas dk önce)"
+
+          tg() {
+            if [ -n "${TG_TOKEN:-}" ] && [ -n "${TG_ID:-}" ]; then
+              curl -sS -o /dev/null -w "Telegram: %{http_code}\n" \
+                "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${TG_ID}" --data-urlencode "text=$1" || true
+            else
+              echo "Telegram gizli değişkenleri tanımlı değil; yalnızca GitHub bildirimi gidecek."
+            fi
+          }
+
+          if [ "$yas" -ge "$ESIK_DK" ]; then
+            fark=$(( yas - ESIK_DK ))
+            # Durum kayıt tutmadan: ilk fark edişte (ilk 30 dk) ve sonra her TEKRAR_DK'da bir uyarır
+            if [ "$fark" -lt 30 ] || [ "$fark" -ge "$TEKRAR_DK" -a $(( fark % TEKRAR_DK )) -lt 30 ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              sure="$(( yas / 60 )) sa $(( yas % 60 )) dk"
+              tg "⚠️ Düşero durdu: fırsat listesi $sure süredir güncellenmiyor (son: $son_tr). Ofis bilgisayarında Kasım Fırsatları programının açık olduğunu ve bilgisayarın uykuya geçmediğini kontrol et."
+              echo "::error::Düşero $sure süredir güncellenmiyor (son: $son_tr)"
+              exit 1   # GitHub da e-posta / uygulama bildirimi gönderir
+            fi
+            echo "Durmuş, ama hatırlatma zamanı değil."
+            exit 0
+          fi
+
+          # Yeniden başladıysa: son güncelleme taze, ondan önceki ile arasında uzun boşluk var
+          if [ "${#tarih[@]}" -ge 2 ] && [ "$yas" -lt 30 ]; then
+            bosluk=$(( ( $(date -u -d "${tarih[0]}" +%s) - $(date -u -d "${tarih[1]}" +%s) ) / 60 ))
+            if [ "$bosluk" -ge "$ESIK_DK" ]; then
+              tg "✅ Düşero tekrar güncelleniyor (son: $son_tr)."
+            fi
+          fi
+          echo "Her şey yolunda."

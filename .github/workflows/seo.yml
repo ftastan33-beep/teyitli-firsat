@@ -1,0 +1,60 @@
+name: Düşero SEO sayfaları
+
+# veri.json'dan Google'ın okuyabileceği kategori/mağaza sayfalarını, sitemap.xml'i ve ana sayfadaki
+# SEO etiketlerini yeniler. Fırsat verisi her güncellendiğinde tetiklenir ama en fazla saatte bir sayfa
+# üretir; ana sayfa tasarımı değişip SEO etiketleri silinirse hemen geri ekler. Program verisine dokunmaz.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "veri.json"
+      - "index.html"
+      - "yasal.html"
+      - "seo/**"
+      - ".github/workflows/seo.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dusero-seo
+  cancel-in-progress: false
+
+jobs:
+  uret:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Sayfaları üret ve yayınla
+        env:
+          # Veri/tasarım güncellemesinde saatte en fazla bir üretim; üretici kodu değiştiyse her zaman üretir
+          BAYRAK: ${{ github.event_name == 'push' && '--gerekirse' || '' }}
+        run: |
+          git config user.name "Düşero SEO"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Fırsat programı da bu depoya sık yazdığı için her denemede en güncel hâl alınır
+          for deneme in 1 2 3 4 5; do
+            git fetch --depth=1 origin main
+            git reset --hard FETCH_HEAD
+            python3 seo/uret.py $BAYRAK
+            git add -A indirimler kacirilmaz-firsatlar cok-satanlar sitemap.xml robots.txt index.html yasal.html
+            if git diff --cached --quiet; then
+              echo "Değişiklik yok"
+              exit 0
+            fi
+            git commit -q -m "SEO sayfaları güncellendi"
+            if git push -q origin HEAD:main; then
+              echo "Yayınlandı (deneme $deneme)"
+              exit 0
+            fi
+            sleep $((deneme * 8))
+          done
+          echo "Gönderilemedi; bir sonraki saatte tekrar denenecek"
+          exit 1
